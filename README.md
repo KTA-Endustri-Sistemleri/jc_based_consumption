@@ -1,6 +1,6 @@
 ### JC Based Consumption
 
-Job Card based Consumption for Custom Systems
+Job Card based Consumption for ERPNEXT Custom Systems
 
 ### Installation
 
