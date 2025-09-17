@@ -128,17 +128,34 @@ app_license = "mit"
 # 	"Event": "frappe.desk.doctype.event.event.has_permission",
 # }
 
+fixtures = [
+    {
+        "dt": "Custom Field",
+        "filters": [
+            ["name", "in", [
+                "Stock Entry-custom_job_card_ref",
+                "Stock Entry Detail-custom_job_card_item_ref",
+                "Manufacturing Settings-custom_job_card_based_consumption"
+            ]]
+        ]
+    }
+]
+
+override_doctype_class = {
+    "Job Card": "jc_based_consumption.overrides.custom_job_card.CustomJobCard"
+}
 # Document Events
 # ---------------
 # Hook on document methods and events
-
+#
 # doc_events = {
-# 	"*": {
-# 		"on_update": "method",
-# 		"on_cancel": "method",
-# 		"on_trash": "method"
-# 	}
-# }
+#    "Job Card": {
+#        "on_submit": "ufuk.job_card_hooks.on_submit_job_card"
+#    },
+#   "Work Order": {
+#        "on_submit": "ufuk.work_order_jc_creator.create_job_cards_with_carton"
+#    }
+#}
 
 # Scheduled Tasks
 # ---------------
