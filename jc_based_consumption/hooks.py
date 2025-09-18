@@ -141,21 +141,21 @@ fixtures = [
     }
 ]
 
-override_doctype_class = {
-    "Job Card": "jc_based_consumption.overrides.custom_job_card.CustomJobCard"
-}
+#override_doctype_class = {
+#    "Job Card": "jc_based_consumption.overrides.custom_job_card.CustomJobCard"
+#}
 # Document Events
 # ---------------
 # Hook on document methods and events
 #
-# doc_events = {
-#    "Job Card": {
-#        "on_submit": "ufuk.job_card_hooks.on_submit_job_card"
-#    },
+doc_events = {
+    "Job Card": {
+        "on_submit": "jc_based_consumption.job_card_hooks.on_submit_job_card"
+    },
 #   "Work Order": {
 #        "on_submit": "ufuk.work_order_jc_creator.create_job_cards_with_carton"
 #    }
-#}
+}
 
 # Scheduled Tasks
 # ---------------

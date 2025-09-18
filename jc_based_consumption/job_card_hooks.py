@@ -1,8 +1,15 @@
-# job_card_hooks.py
 import frappe
 from frappe.utils import get_datetime
 
 def on_submit_job_card(doc, method=None):
+    # 🔑 Manufacturing Settings kontrolü
+    use_jobcard_based_consumption = frappe.db.get_single_value(
+        "Manufacturing Settings",
+        "custom_job_card_based_consumption"
+    )
+    if not use_jobcard_based_consumption:
+        return  # ➡️ Ayar kapalıysa core ERPNext mantığı çalışır
+
     logger = frappe.logger("job_card_hooks", allow_site=True, file_count=10)
 
     # İlgili Work Order'ı al
@@ -103,7 +110,7 @@ def on_submit_job_card(doc, method=None):
         frappe.msgprint(f"Manufacture Entry {se.name} created for {completed_qty} qty in Job Card {doc.name}")
         return se
 
-    # 📦 İş mantığı (sadece ayar açıkken)
+    # 📦 İş mantığı
     if is_last:
         create_consumption_entry()
         create_manufacture_entry()
