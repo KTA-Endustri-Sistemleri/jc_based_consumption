@@ -77,7 +77,7 @@ def on_submit_job_card(doc, method=None):
         return se
 
     # 🔑 FG üretim (sadece son operasyonda)
-    def create_manufacture_entry():
+    def create_manufacture_entry(doc, wo, completed_qty, posting_time, logger):
         se = frappe.new_doc("Stock Entry")
         se.stock_entry_type = "Manufacture"
         se.work_order = doc.work_order
@@ -90,29 +90,54 @@ def on_submit_job_card(doc, method=None):
         se.from_bom = 1
         se.bom_no = wo.bom_no
         se.use_multi_level_bom = 0
-
         se.custom_job_card_ref = doc.name
 
-        row = se.append("items", {
+        plan_qty = float(doc.for_quantity or 1)
+        factor = (float(completed_qty) / plan_qty) if plan_qty else 1.0
+
+        # 🔑 Hammadde tüketimi
+        for item in doc.items:
+            consume_qty = (item.required_qty or 0) * factor
+            row = se.append("items", {
+                "item_code": item.item_code,
+                "s_warehouse": doc.wip_warehouse,
+                "qty": consume_qty,
+                "uom": item.uom,
+                "stock_uom": item.stock_uom,
+                "conversion_factor": 1,
+            })
+            row.custom_job_card_item_ref = item.name
+            logger.info(
+                f"[{doc.name}] Consume {consume_qty} {item.uom} of {item.item_code} "
+                f"(completed_qty={completed_qty}, plan_qty={plan_qty}, factor={factor:.3f})"
+            )
+
+        # 🔑 FG satırı
+        target_wh = doc.target_warehouse or wo.fg_warehouse
+        if not target_wh:
+            frappe.throw("Target Warehouse bulunamadı. Lütfen Job Card veya Work Order'da tanımlayın.")
+
+        se.append("items", {
             "item_code": doc.production_item,
-            "t_warehouse": doc.target_warehouse,
-            "qty": float(completed_qty),
+            "t_warehouse": target_wh,          # 🔑 v15 için zorunlu
+            "qty": float(completed_qty),       # 🔑 fg_completed_qty ile aynı olmalı
             "uom": wo.stock_uom,
             "stock_uom": wo.stock_uom,
             "conversion_factor": 1,
             "is_finished_item": 1
         })
 
-        logger.info(f"[{doc.name}] FG {completed_qty} {wo.stock_uom} → {doc.target_warehouse}")
+        logger.info(
+            f"[{doc.name}] Manufacture (consume + FG) {completed_qty} {wo.stock_uom} → {target_wh}"
+        )
 
         se.insert(ignore_permissions=True)
         se.submit()
-        frappe.msgprint(f"Manufacture Entry {se.name} created for {completed_qty} qty in Job Card {doc.name}")
+        frappe.msgprint(f"Manufacture Entry {se.name} created with {completed_qty} qty in Job Card {doc.name}")
         return se
 
     # 📦 İş mantığı
     if is_last:
-        create_consumption_entry()
         create_manufacture_entry()
     else:
         create_consumption_entry()
