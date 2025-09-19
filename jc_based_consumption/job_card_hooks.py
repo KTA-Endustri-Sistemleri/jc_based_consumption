@@ -8,7 +8,7 @@ def on_submit_job_card(doc, method=None):
         "custom_job_card_based_consumption"
     )
     if not use_jobcard_based_consumption:
-        return  # ➡️ Ayar kapalıysa core ERPNext mantığı çalışır
+        return
 
     logger = frappe.logger("job_card_hooks", allow_site=True, file_count=10)
 
@@ -37,19 +37,17 @@ def on_submit_job_card(doc, method=None):
         except Exception:
             posting_time = None
 
-    # 🔑 Ara ve son operasyonlarda tüketim
+    # 🔑 Ara operasyonlarda tüketim
     def create_consumption_entry():
         se = frappe.new_doc("Stock Entry")
         se.stock_entry_type = "Material Consumption for Manufacture"
-        se.work_order = None  # 🚫 Ara operasyonlarda Work Order set edilmez
+        se.work_order = None
         se.company = doc.company
         se.posting_date = doc.posting_date
         se.posting_time = posting_time
         se.for_quantity = float(completed_qty)
-        se.manufactured_qty = float(completed_qty)
         se.fg_completed_qty = 0
         se.from_bom = 0
-
         se.custom_job_card_ref = doc.name
 
         plan_qty = float(doc.for_quantity or 1)
@@ -57,7 +55,7 @@ def on_submit_job_card(doc, method=None):
 
         for item in doc.items:
             consume_qty = (item.required_qty or 0) * factor
-            row = se.append("items", {
+            se.append("items", {
                 "item_code": item.item_code,
                 "s_warehouse": doc.wip_warehouse,
                 "qty": consume_qty,
@@ -65,19 +63,18 @@ def on_submit_job_card(doc, method=None):
                 "stock_uom": item.stock_uom,
                 "conversion_factor": 1,
             })
-            row.custom_job_card_item_ref = item.name
             logger.info(
                 f"[{doc.name}] Consume {consume_qty} {item.uom} of {item.item_code} "
-                f"(completed_qty={completed_qty}, plan_qty={plan_qty}, factor={factor:.3f})"
+                f"→ {doc.wip_warehouse}"
             )
 
         se.insert(ignore_permissions=True)
         se.submit()
-        frappe.msgprint(f"Consumption Entry {se.name} created for {completed_qty} qty in Job Card {doc.name}")
+        frappe.msgprint(f"✅ Consumption Entry {se.name} ({completed_qty} qty)")
         return se
 
-    # 🔑 FG üretim (sadece son operasyonda)
-    def create_manufacture_entry(doc, wo, completed_qty, posting_time, logger):
+    # 🔑 Son operasyonda hem tüketim hem üretim
+    def create_manufacture_entry():
         se = frappe.new_doc("Stock Entry")
         se.stock_entry_type = "Manufacture"
         se.work_order = doc.work_order
@@ -95,10 +92,10 @@ def on_submit_job_card(doc, method=None):
         plan_qty = float(doc.for_quantity or 1)
         factor = (float(completed_qty) / plan_qty) if plan_qty else 1.0
 
-        # 🔑 Hammadde tüketimi
+        # Hammadde tüketimi
         for item in doc.items:
             consume_qty = (item.required_qty or 0) * factor
-            row = se.append("items", {
+            se.append("items", {
                 "item_code": item.item_code,
                 "s_warehouse": doc.wip_warehouse,
                 "qty": consume_qty,
@@ -106,34 +103,32 @@ def on_submit_job_card(doc, method=None):
                 "stock_uom": item.stock_uom,
                 "conversion_factor": 1,
             })
-            row.custom_job_card_item_ref = item.name
             logger.info(
-                f"[{doc.name}] Consume {consume_qty} {item.uom} of {item.item_code} "
-                f"(completed_qty={completed_qty}, plan_qty={plan_qty}, factor={factor:.3f})"
+                f"[{doc.name}] Manufacture consume {consume_qty} {item.uom} "
+                f"of {item.item_code} → {doc.wip_warehouse}"
             )
 
-        # 🔑 FG satırı
-        target_wh = doc.target_warehouse or wo.fg_warehouse
+        # FG satırı (sadece Work Order’dan alınır)
+        target_wh = wo.fg_warehouse
         if not target_wh:
-            frappe.throw("Target Warehouse bulunamadı. Lütfen Job Card veya Work Order'da tanımlayın.")
+            frappe.throw("FG Warehouse bulunamadı. Lütfen Work Order'da tanımlayın.")
 
         se.append("items", {
             "item_code": doc.production_item,
-            "t_warehouse": target_wh,          # 🔑 v15 için zorunlu
-            "qty": float(completed_qty),       # 🔑 fg_completed_qty ile aynı olmalı
+            "t_warehouse": target_wh,
+            "qty": float(completed_qty),
             "uom": wo.stock_uom,
             "stock_uom": wo.stock_uom,
             "conversion_factor": 1,
             "is_finished_item": 1
         })
-
         logger.info(
-            f"[{doc.name}] Manufacture (consume + FG) {completed_qty} {wo.stock_uom} → {target_wh}"
+            f"[{doc.name}] FG {completed_qty} {wo.stock_uom} → {target_wh}"
         )
 
         se.insert(ignore_permissions=True)
         se.submit()
-        frappe.msgprint(f"Manufacture Entry {se.name} created with {completed_qty} qty in Job Card {doc.name}")
+        frappe.msgprint(f"✅ Manufacture Entry {se.name} ({completed_qty} qty)")
         return se
 
     # 📦 İş mantığı
