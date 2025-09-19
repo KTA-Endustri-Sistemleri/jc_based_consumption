@@ -55,7 +55,7 @@ def on_submit_job_card(doc, method=None):
 
         for item in doc.items:
             consume_qty = (item.required_qty or 0) * factor
-            se.append("items", {
+            row = se.append("items", {
                 "item_code": item.item_code,
                 "s_warehouse": doc.wip_warehouse,
                 "qty": consume_qty,
@@ -63,6 +63,7 @@ def on_submit_job_card(doc, method=None):
                 "stock_uom": item.stock_uom,
                 "conversion_factor": 1,
             })
+            row.custom_job_card_item_ref = item.name
             logger.info(
                 f"[{doc.name}] Consume {consume_qty} {item.uom} of {item.item_code} "
                 f"→ {doc.wip_warehouse}"
@@ -95,7 +96,7 @@ def on_submit_job_card(doc, method=None):
         # Hammadde tüketimi
         for item in doc.items:
             consume_qty = (item.required_qty or 0) * factor
-            se.append("items", {
+            row = se.append("items", {
                 "item_code": item.item_code,
                 "s_warehouse": doc.wip_warehouse,
                 "qty": consume_qty,
@@ -103,6 +104,7 @@ def on_submit_job_card(doc, method=None):
                 "stock_uom": item.stock_uom,
                 "conversion_factor": 1,
             })
+            row.custom_job_card_item_ref = item.name
             logger.info(
                 f"[{doc.name}] Manufacture consume {consume_qty} {item.uom} "
                 f"of {item.item_code} → {doc.wip_warehouse}"
