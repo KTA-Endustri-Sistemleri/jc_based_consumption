@@ -11,6 +11,7 @@ This app overrides the default **Job Card → on_submit** behavior:
   - Falls back to the **default ERPNext behavior**.
 
 ✅ Developed and tested on **ERPNext v15.x.x (develop branch, commit 29197af)**.
+✅ Developed and tested on **ERPNext v15.79.0
 
 ---
 
